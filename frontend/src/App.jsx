@@ -7,6 +7,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Partidas from './pages/Partidas';
+import PartidaDetalhes from './pages/PartidaDetalhes';
+import CriarPartida from './pages/CriarPartida';
 import Jogadores from './pages/Jogadores';
 import Quadras from './pages/Quadras';
 import Campeonatos from './pages/Campeonatos';
@@ -36,6 +38,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/partidas" element={<Partidas />} />
+            <Route path="/partidas/:id" element={<PartidaDetalhes />} />
+            <Route path="/criar-partida" element={<PrivateRoute><CriarPartida /></PrivateRoute>} />
             <Route path="/jogadores" element={<Jogadores />} />
             <Route path="/quadras" element={<Quadras />} />
             <Route path="/campeonatos" element={<Campeonatos />} />
