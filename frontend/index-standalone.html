@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pelada Fácil - Organize sua partida</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: '#00875f', dark: '#00684a', light: '#00a86b' },
+            accent: { DEFAULT: '#ff6b35', dark: '#e55a2b' },
+            dark: { DEFAULT: '#1a1a1a', light: '#2d2d2d' }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .gradient-hero { 
+      background: linear-gradient(135deg, #00875f 0%, #00a86b 50%, #00684a 100%);
+    }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+    .stat-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="app"></div>
+  
+  <script type="module">
+    const API_URL = 'http://localhost:5000/api';
+    let currentPage = 'home';
+    let currentUser = null;
+    let token = localStorage.getItem('token');
+    let partidas = [];
+    let jogadores = [];
+    let campeonatos = [];
+    let stats = null;
+    
+    // Carregar dados iniciais
+    const loadData = async () => {
+      try {
+        const [partidasRes, statsRes] = await Promise.all([
+          fetch(API_URL + '/partidas'),
+          fetch(API_URL + '/stats/dashboard')
+        ]);
+        partidas = await partidasRes.json();
+        stats = await statsRes.json();
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+      }
+    };
+    
+    loadData();
+    
+    if (token) {
+      fetch(API_URL + '/users/me', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+      .then(res => res.json())
+      .then(data => {
+        currentUser = data;
+        render();
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        render();
+      });
+    }
+    
+    const navigate = (page) => {
+      currentPage = page;
+      window.scrollTo(0, 0);
+      render();
+      
+      // Carregar dados específicos da página
+      if (page === 'partidas') {
+        fetch(API_URL + '/partidas')
+          .then(res => res.json())
+          .then(data => {
+            partidas = data;
+            render();
+          });
+      } else if (page === 'jogadores') {
+        fetch(API_URL + '/users')
+          .then(res => res.json())
+          .then(data => {
+            jogadores = data;
+            render();
+          });
+      } else if (page === 'campeonatos') {
+        fetch(API_URL + '/campeonatos')
+          .then(res => res.json())
+          .then(data => {
+            campeonatos = data;
+            render();
+          });
+      }
+    };
+    
+    const logout = () => {
+      localStorage.removeItem('token');
+      currentUser = null;
+      token = null;
+      navigate('home');
+    };
+    
+    const Navbar = () => `
+      <nav class="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-4">
+          <div class="flex justify-between items-center h-16">
+            <a href="#" onclick="navigate('home'); return false;" class="flex items-center space-x-2 group">
+              <svg class="w-9 h-9 text-primary group-hover:text-primary-light transition" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/>
+              </svg>
+              <div class="flex flex-col -space-y-1">
+                <span class="text-xl font-bold text-gray-900 leading-none">Pelada Fácil</span>
+                <span class="text-xs text-primary font-medium">Esporte Amador</span>
+              </div>
+            </a>
+            
+            <div class="hidden md:flex items-center space-x-8">
+              <a href="#" onclick="navigate('partidas'); return false;" class="text-sm font-medium text-gray-700 hover:text-primary transition">Partidas</a>
+              <a href="#" onclick="navigate('campeonatos'); return false;" class="text-sm font-medium text-gray-700 hover:text-primary transition">Campeonatos</a>
+              <a href="#" onclick="navigate('jogadores'); return false;" class="text-sm font-medium text-gray-700 hover:text-primary transition">Jogadores</a>
+              
+              ${currentUser ? `
+                <div class="flex items-center space-x-3">
+                  <a href="#" onclick="navigate('perfil'); return false;" class="flex items-center space-x-2 group">
+                    <img src="${currentUser.foto}" class="w-8 h-8 rounded-full ring-2 ring-gray-100 group-hover:ring-primary transition" />
+                    <span class="text-sm font-medium text-gray-700 group-hover:text-primary">${currentUser.nome.split(' ')[0]}</span>
+                  </a>
+                  ${currentUser.is_admin ? `<a href="#" onclick="navigate('admin'); return false;" class="text-sm font-medium text-accent hover:text-accent-dark">Admin</a>` : ''}
+                  <button onclick="logout()" class="text-sm font-medium text-red-600 hover:text-red-700 transition">Sair</button>
+                </div>
+              ` : `
+                <a href="#" onclick="navigate('login'); return false;" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-primary-dark transition shadow-sm">Entrar</a>
+              `}
+            </div>
+            
+            <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </nav>
+    `;
+    
+    const HomePage = () => `
+      <div>
+        ${Navbar()}
+        
+        <!-- Hero Section -->
+        <div class="gradient-hero text-white relative overflow-hidden">
+          <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+            <div class="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/2 translate-y-1/2"></div>
+          </div>
+          <div class="max-w-7xl mx-auto px-4 py-20 relative">
+            <div class="text-center max-w-4xl mx-auto">
+              <h1 class="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+                A Revolução do<br/>Esporte Amador
+              </h1>
+              <p class="text-xl md:text-2xl mb-4 text-green-50 font-medium">
+                Organize partidas, encontre jogadores e participe de campeonatos
+              </p>
+              <p class="text-lg mb-10 text-green-100 max-w-2xl mx-auto">
+                A plataforma completa para atletas amadores. Nunca mais cancele um jogo por falta de gente!
+              </p>
+              <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="#" onclick="navigate('partidas'); return false;" class="bg-white text-primary px-8 py-4 rounded-lg text-lg font-bold hover:bg-gray-50 transition shadow-lg w-full sm:w-auto text-center">
+                  Ver Partidas Abertas
+                </a>
+                <a href="#" onclick="navigate('register'); return false;" class="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-bold hover:bg-white hover:text-primary transition w-full sm:w-auto text-center">
+                  Criar Conta Grátis
+                </a>
+              </div>
+            </div>
+            
+            ${stats ? `
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-4xl mx-auto">
+                <div class="stat-card rounded-xl p-6 text-center border border-white border-opacity-20">
+                  <div class="text-4xl font-bold mb-1">${stats.totalUsuarios}+</div>
+                  <div class="text-sm text-green-100">Jogadores Ativos</div>
+                </div>
+                <div class="stat-card rounded-xl p-6 text-center border border-white border-opacity-20">
+                  <div class="text-4xl font-bold mb-1">${stats.partidasAbertas}</div>
+                  <div class="text-sm text-green-100">Partidas Abertas</div>
+                </div>
+                <div class="stat-card rounded-xl p-6 text-center border border-white border-opacity-20">
+                  <div class="text-4xl font-bold mb-1">${stats.totalPartidas}+</div>
+                  <div class="text-sm text-green-100">Partidas Realizadas</div>
+                </div>
+                <div class="stat-card rounded-xl p-6 text-center border border-white border-opacity-20">
+                  <div class="text-4xl font-bold mb-1">${stats.totalCampeonatos}</div>
+                  <div class="text-sm text-green-100">Campeonatos</div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+        
+        <!-- Features Section -->
+        <div class="py-20 bg-white">
+          <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-16">
+              <h2 class="text-4xl font-bold text-gray-900 mb-4">Por que escolher o Pelada Fácil?</h2>
+              <p class="text-xl text-gray-600">A plataforma mais completa para o esporte amador no Brasil</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+              <div class="card-hover bg-gray-50 rounded-2xl p-8 border border-gray-100">
+                <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-6">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                  </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">Mercado de Jogadores</h3>
+                <p class="text-gray-600 leading-relaxed">Encontre jogadores disponíveis na sua região em segundos. Convoque atletas ranqueados e nunca mais cancele um jogo por falta de gente.</p>
+              </div>
+              
+              <div class="card-hover bg-gray-50 rounded-2xl p-8 border border-gray-100">
+                <div class="w-14 h-14 bg-accent rounded-xl flex items-center justify-center mb-6">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                  </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">Gamificação Completa</h3>
+                <p class="text-gray-600 leading-relaxed">Acompanhe suas estatísticas, conquiste troféus e suba no ranking. Transforme seu desempenho em evolução como num videogame.</p>
+              </div>
+              
+              <div class="card-hover bg-gray-50 rounded-2xl p-8 border border-gray-100">
+                <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center mb-6">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">Organização Simples</h3>
+                <p class="text-gray-600 leading-relaxed">Crie e gerencie partidas e campeonatos em minutos. Sorteio automático de times, controle financeiro e muito mais.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Próximas Partidas -->
+        <div class="py-20 bg-gray-50">
+          <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center mb-10">
+              <div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Próximas Partidas</h2>
+                <p class="text-gray-600">Encontre a partida perfeita para você</p>
+              </div>
+              <a href="#" onclick="navigate('partidas'); return false;" class="text-primary font-semibold hover:text-primary-dark transition flex items-center gap-2">
+                Ver todas
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </a>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-6">
+              ${partidas.slice(0, 3).map(p => `
+                <div class="card-hover bg-white rounded-xl overflow-hidden border border-gray-100">
+                  <div class="h-48 bg-gradient-to-br from-primary to-primary-light relative">
+                    <div class="absolute inset-0 bg-black bg-opacity-20"></div>
+                    <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800" class="w-full h-full object-cover mix-blend-overlay" />
+                    <div class="absolute top-4 left-4">
+                      <span class="bg-white bg-opacity-95 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase">${p.esporte}</span>
+                    </div>
+                    <div class="absolute top-4 right-4">
+                      <span class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">${p.vagas_disponiveis} vagas</span>
+                    </div>
+                  </div>
+                  <div class="p-6">
+                    <h3 class="font-bold text-lg text-gray-900 mb-3 line-clamp-1">${p.titulo}</h3>
+                    <div class="space-y-2 mb-4">
+                      <div class="flex items-center text-sm text-gray-600">
+                        <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        ${new Date(p.data_hora).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div class="flex items-center text-sm text-gray-600">
+                        <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        ${p.local}
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div class="flex items-center gap-2">
+                        <img src="${p.organizador_foto}" class="w-8 h-8 rounded-full border-2 border-gray-100" />
+                        <span class="text-sm text-gray-600">${p.organizador_nome.split(' ')[0]}</span>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-2xl font-bold text-primary">R$ ${p.valor_individual}</div>
+                        <div class="text-xs text-gray-500">por pessoa</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        
+        <!-- CTA Section -->
+        <div class="bg-gradient-to-r from-primary via-primary-light to-primary-dark text-white py-20">
+          <div class="max-w-4xl mx-auto text-center px-4">
+            <h2 class="text-4xl md:text-5xl font-bold mb-6">Pronto para jogar?</h2>
+            <p class="text-xl md:text-2xl mb-10 text-green-50">Junte-se a milhares de atletas amadores e leve seu jogo para o próximo nível</p>
+            <a href="#" onclick="navigate('register'); return false;" class="inline-block bg-white text-primary px-10 py-4 rounded-lg text-lg font-bold hover:bg-gray-50 transition shadow-xl">
+              Comece Agora - É Grátis!
+            </a>
+            <p class="text-sm text-green-100 mt-4">Sem cartão de crédito. Sem compromisso.</p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-gray-300 py-12">
+          <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="flex items-center justify-center space-x-2 mb-4">
+              <svg class="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/>
+              </svg>
+              <span class="text-xl font-bold text-white">Pelada Fácil</span>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">A revolução do esporte amador</p>
+            <div class="text-xs text-gray-500">
+              © 2025 Pelada Fácil. Todos os direitos reservados.
+            </div>
+          </div>
+        </footer>
+      </div>
+    `;
+    
+    const LoginPage = () => `
+      <div class="min-h-screen flex">
+        <!-- Left Side - Image -->
+        <div class="hidden lg:block lg:w-1/2 relative overflow-hidden gradient-hero">
+          <div class="absolute inset-0 bg-black bg-opacity-20"></div>
+          <img src="https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=1200" class="w-full h-full object-cover mix-blend-overlay" />
+          <div class="absolute inset-0 flex items-center justify-center text-white p-12">
+            <div class="max-w-md">
+              <h2 class="text-4xl font-bold mb-4">Bem-vindo de volta!</h2>
+              <p class="text-xl text-green-50">Acesse sua conta e organize sua próxima partida</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right Side - Form -->
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+          <div class="max-w-md w-full">
+            <div class="text-center mb-8">
+              <svg class="w-16 h-16 text-primary mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/>
+              </svg>
+              <h1 class="text-3xl font-bold text-gray-900 mb-2">Entrar na sua conta</h1>
+              <p class="text-gray-600">Organize partidas e encontre jogadores</p>
+            </div>
+            
+            <form onsubmit="handleLogin(event)" class="space-y-5">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                <input 
+                  type="email" 
+                  id="login-email" 
+                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-0 outline-none transition"
+                  placeholder="seu@email.com"
+                  required 
+                />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Senha</label>
+                <input 
+                  type="password" 
+                  id="login-senha" 
+                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-0 outline-none transition"
+                  placeholder="••••••••"
+                  required 
+                />
+              </div>
+              
+              <button type="submit" class="w-full bg-primary text-white px-4 py-3 rounded-lg font-bold hover:bg-primary-dark transition shadow-sm">
+                Entrar
+              </button>
+            </form>
+            
+            <div class="mt-6 text-center">
+              <p class="text-gray-600">
+                Não tem uma conta? 
+                <a href="#" onclick="navigate('register'); return false;" class="text-primary font-semibold hover:text-primary-dark">Cadastre-se gratuitamente</a>
+              </p>
+            </div>
+            
+            <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <p class="text-sm font-semibold text-blue-900 mb-2">Conta de teste:</p>
+              <p class="text-xs text-blue-700">Email: admin@peladafacil.com</p>
+              <p class="text-xs text-blue-700">Senha: admin123</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const PartidasPage = () => `
+      <div class="min-h-screen bg-gray-50">
+        ${Navbar()}
+        
+        <div class="bg-gradient-to-r from-primary to-primary-light text-white py-12">
+          <div class="max-w-7xl mx-auto px-4">
+            <h1 class="text-4xl font-bold mb-2">Partidas Abertas</h1>
+            <p class="text-green-50 text-lg">Encontre a partida perfeita para você jogar</p>
+          </div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 py-12">
+          <div class="grid md:grid-cols-3 gap-6">
+            ${partidas.map(p => `
+              <div class="card-hover bg-white rounded-xl overflow-hidden border border-gray-100">
+                <div class="h-44 bg-gradient-to-br from-primary to-primary-light relative">
+                  <img src="https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600" class="w-full h-full object-cover mix-blend-overlay opacity-50" />
+                  <div class="absolute top-3 left-3">
+                    <span class="bg-white text-primary px-3 py-1 rounded-full text-xs font-bold">${p.esporte}</span>
+                  </div>
+                  <div class="absolute top-3 right-3">
+                    <span class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">${p.vagas_disponiveis} vagas</span>
+                  </div>
+                </div>
+                <div class="p-5">
+                  <h3 class="font-bold text-lg mb-3">${p.titulo}</h3>
+                  <div class="space-y-2 text-sm text-gray-600 mb-4">
+                    <div class="flex items-center">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      </svg>
+                      ${new Date(p.data_hora).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div class="flex items-center">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                      </svg>
+                      ${p.local}
+                    </div>
+                  </div>
+                  <div class="flex justify-between items-center pt-4 border-t">
+                    <span class="text-2xl font-bold text-primary">R$ ${p.valor_individual}</span>
+                    <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-dark transition">
+                      Ver Detalhes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    window.handleLogin = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const senha = document.getElementById('login-senha').value;
+      
+      try {
+        const res = await fetch(API_URL + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, senha })
+        });
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          token = data.token;
+          const userRes = await fetch(API_URL + '/users/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          currentUser = await userRes.json();
+          navigate('home');
+        } else {
+          alert('Email ou senha inválidos');
+        }
+      } catch (err) {
+        alert('Erro ao fazer login. Verifique suas credenciais.');
+      }
+    };
+    
+    const render = () => {
+      const app = document.getElementById('app');
+      
+      switch(currentPage) {
+        case 'home':
+          app.innerHTML = HomePage();
+          break;
+        case 'login':
+          app.innerHTML = LoginPage();
+          break;
+        case 'partidas':
+          app.innerHTML = PartidasPage();
+          break;
+        default:
+          app.innerHTML = HomePage();
+      }
+    };
+    
+    window.navigate = navigate;
+    window.logout = logout;
+    window.toggleMobileMenu = () => {};
+    
+    render();
+  </script>
+</body>
+</html>
